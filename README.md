@@ -101,19 +101,33 @@ src/
     cd task-management-api
     ```
 
-2.  **Install dependencies:**
+2.  **Install dependencies (npm or pnpm):**
+    Using npm:
+    ```bash
+    npm install
+    ```
+    Or using pnpm:
     ```bash
     pnpm install
     ```
 
 3.  **Set up environment variables:**
-    Create a `.env` file in the root directory based on `.env.example`.
+    Create a `.env` file in the root directory based on `.env.example` and add the keys listed in the Environment Variables section.
 
 4.  **Start the development server:**
+    Using npm:
+    ```bash
+    npm run dev
+    ```
+    Or with pnpm:
     ```bash
     pnpm run dev
     ```
     The API will be running at `http://localhost:5000`.
+
+Notes
+- Ensure you do not commit `.env`. The repo includes `.gitignore` which excludes `.env`.
+- If you run into MongoDB connection issues, confirm your `MONGO_URI` includes a target database name and that your Atlas Network Access list allows connections from your environment.
 
 ## Environment Variables
 
@@ -137,15 +151,43 @@ CLIENT_URL=http://localhost:3000
 
 Access the interactive API documentation (Swagger UI) at `http://localhost:5000/api/docs` when the server is running.
 
-## Railway Deployment Guide
+## Deployment (Render)
 
-This project is configured for seamless deployment on Railway. Ensure your `.env` variables are set correctly in Railway's environment settings.
+This section documents deploying the service to Render.
 
-1.  **Create a new project on Railway.**
-2.  **Connect your GitHub repository.**
-3.  **Railway will automatically detect the Node.js project and deploy it.**
-4.  **Configure Environment Variables:** Add the variables from your `.env` file to Railway's variables section.
-5.  **Add a MongoDB service:** Link a MongoDB service to your project on Railway, and ensure `MONGO_URI` is correctly set.
+1. Push your repository to GitHub (this repo is already connected in the example):
+
+```bash
+git add README.md
+git commit -m "docs: update deployment instructions"
+git push origin main
+```
+
+2. On Render dashboard → New → Web Service → Connect your GitHub repo and select the `main` branch.
+
+3. Service settings:
+- Environment: `Node`
+- Build command: `npm install`
+- Start command: `npm start` (uses `node src/server.js` from `package.json`)
+
+4. Add Environment Variables (Render → your service → Environment):
+
+- `PORT` → `5000` (optional; Render provides a port)
+- `MONGO_URI` → your full Atlas connection string; example format:
+  `mongodb+srv://<dbUser>:<password>@cluster0.aghnt01.mongodb.net/<database>?retryWrites=true&w=majority&appName=Cluster0`
+- `JWT_SECRET` → a single-line secret string
+- `JWT_EXPIRES_IN` → `7d`
+
+5. Save and deploy: click **Manual Deploy** or push a new commit to trigger Auto Deploy.
+
+Notes and troubleshooting
+- Make sure the `MONGO_URI` value in Render has no surrounding quotes or newlines. The URI must be a single string.
+- Because Render uses dynamic outbound IPs, add `0.0.0.0/0` to your Atlas Network Access list for initial testing. For production, prefer a private endpoint or tighten the access list.
+- Check logs on Render (Service → Logs) for `✅ MongoDB connected` and server start messages.
+
+Security
+- Never commit `.env` or any credentials to Git. This project includes `.gitignore` with `.env` already ignored.
+- If you suspect credentials were exposed, rotate the database user's password in Atlas and update `MONGO_URI` in Render, and generate a new `JWT_SECRET`.
 
 ## Example Requests
 
