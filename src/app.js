@@ -1,33 +1,30 @@
 const express = require('express');
-const cors = require('cors');
-const helmet = require('helmet');
+const dotenv = require('dotenv');
 const morgan = require('morgan');
-const rateLimit = require('express-rate-limit');
+const { setupSecurity, apiLimiter } = require('./middlewares/security');
+const errorHandler = require('./middlewares/errorHandler');
 
-const authRoutes = require('./routes/authRoutes');
-const workspaceRoutes = require('./routes/workspaceRoutes');
-const errorHandler = require('./middleware/errorHandler');
+// Load env vars
+dotenv.config();
 
 const app = express();
 
-// Security & logging
-app.use(helmet());
-app.use(cors());
-app.use(morgan(process.env.NODE_ENV === 'development' ? 'dev' : 'combined'));
+// Security configuration
+setupSecurity(app);
 
-// Rate limiting — 100 requests per 15 min per IP
-const limiter = rateLimit({
-  windowMs: 15 * 60 * 1000,
-  max: 100,
-  message: { success: false, message: 'Too many requests, please try again later.' },
+// Logging
+if (process.env.NODE_ENV === 'development') {
+  app.use(morgan('dev'));
+} else {
+  app.use(morgan('combined'));
+}
+
+// Health check
+app.get('/health', (req, res) => {
+  res.status(200).json({ status: 'UP', timestamp: new Date().toISOString() });
 });
-app.use('/api', limiter);
 
-// Body parsing
-app.use(express.json());
-app.use(express.urlencoded({ extended: false }));
-
-// Routes
+// Root route
 app.get('/', (req, res) => {
   res.json({
     success: true,
@@ -37,15 +34,22 @@ app.get('/', (req, res) => {
   });
 });
 
-app.use('/api/auth', authRoutes);
-app.use('/api/workspaces', workspaceRoutes);
+// Swagger Documentation
+const { swaggerUi, specs } = require('./docs/swagger');
+app.use('/api/docs', swaggerUi.serve, swaggerUi.setup(specs));
+
+// Routes
+app.use('/api/auth', require('./routes/authRoutes'));
+app.use('/api/users', require('./routes/userRoutes'));
+app.use('/api/workspaces', apiLimiter, require('./routes/workspaceRoutes'));
+app.use('/api/tasks', apiLimiter, require('./routes/taskRoutes'));
 
 // 404 handler
 app.use((req, res) => {
   res.status(404).json({ success: false, message: `Route ${req.originalUrl} not found` });
 });
 
-// Global error handler (must be last)
+// Global error handler
 app.use(errorHandler);
 
 module.exports = app;

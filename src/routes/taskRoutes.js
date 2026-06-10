@@ -1,19 +1,31 @@
 const express = require('express');
 const {
-  getTasks,
-  getTask,
   createTask,
+  getTasks,
+  getTaskDetails,
   updateTask,
   deleteTask,
+  patchTaskStatus,
+  patchTaskAssign
 } = require('../controllers/taskController');
-const { protect } = require('../middleware/auth');
+const { protect } = require('../middlewares/auth');
+const { taskValidationRules, updateTaskValidationRules } = require('../validators/appValidator');
+const { validate } = require('../validators/authValidator');
 
-// mergeParams lets us access :workspaceId from the parent router
-const router = express.Router({ mergeParams: true });
+const router = express.Router();
 
-router.use(protect); // all task routes require auth
+router.use(protect);
 
-router.route('/').get(getTasks).post(createTask);
-router.route('/:id').get(getTask).put(updateTask).delete(deleteTask);
+router.route('/')
+  .post(taskValidationRules(), validate, createTask)
+  .get(getTasks);
+
+router.route('/:id')
+  .get(getTaskDetails)
+  .put(updateTaskValidationRules(), validate, updateTask)
+  .delete(deleteTask);
+
+router.patch('/:id/status', patchTaskStatus);
+router.patch('/:id/assign', patchTaskAssign);
 
 module.exports = router;

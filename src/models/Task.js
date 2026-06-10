@@ -11,17 +11,19 @@ const taskSchema = new mongoose.Schema(
     description: {
       type: String,
       trim: true,
-      maxlength: [500, 'Description cannot exceed 500 characters'],
+      maxlength: [1000, 'Description cannot exceed 1000 characters'],
     },
     status: {
       type: String,
-      enum: ['todo', 'in-progress', 'done'],
+      enum: ['todo', 'in-progress', 'completed'],
       default: 'todo',
+      index: true
     },
     priority: {
       type: String,
       enum: ['low', 'medium', 'high'],
       default: 'medium',
+      index: true
     },
     dueDate: {
       type: Date,
@@ -29,24 +31,25 @@ const taskSchema = new mongoose.Schema(
     assignedTo: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'User',
+      index: true
     },
     createdBy: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'User',
       required: true,
     },
-    workspace: {
+    workspaceId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'Workspace',
       required: true,
+      index: true
     },
     tags: [{ type: String, trim: true }],
   },
   { timestamps: true }
 );
 
-// Index for faster filtered queries
-taskSchema.index({ workspace: 1, status: 1 });
-taskSchema.index({ assignedTo: 1 });
+// Full text search index
+taskSchema.index({ title: 'text', description: 'text' });
 
 module.exports = mongoose.model('Task', taskSchema);

@@ -6,17 +6,18 @@ const workspaceSchema = new mongoose.Schema(
       type: String,
       required: [true, 'Workspace name is required'],
       trim: true,
-      maxlength: [60, 'Name cannot exceed 60 characters'],
+      maxlength: [100, 'Name cannot exceed 100 characters'],
     },
     description: {
       type: String,
       trim: true,
-      maxlength: [200, 'Description cannot exceed 200 characters'],
+      maxlength: [500, 'Description cannot exceed 500 characters'],
     },
     owner: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'User',
       required: true,
+      index: true
     },
     members: [
       {
@@ -27,5 +28,7 @@ const workspaceSchema = new mongoose.Schema(
   },
   { timestamps: true }
 );
+
+workspaceSchema.index({ 'members.user': 1 });
 
 module.exports = mongoose.model('Workspace', workspaceSchema);

@@ -16,16 +16,17 @@ const userSchema = new mongoose.Schema(
       lowercase: true,
       trim: true,
       match: [/^\S+@\S+\.\S+$/, 'Please enter a valid email'],
+      index: true
     },
     password: {
       type: String,
       required: [true, 'Password is required'],
       minlength: [6, 'Password must be at least 6 characters'],
-      select: false, // never return password in queries by default
+      select: false,
     },
     role: {
       type: String,
-      enum: ['member', 'admin'],
+      enum: ['owner', 'admin', 'member'],
       default: 'member',
     },
   },

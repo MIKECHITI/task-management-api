@@ -1,19 +1,30 @@
 const User = require('../models/User');
-const { generateToken } = require('../utils/generateToken');
+const jwt = require('jsonwebtoken');
+const { logAction } = require('../services/auditService');
 
-// @desc    Register a new user
-// @route   POST /api/auth/register
-// @access  Public
+const generateToken = (id) => {
+  return jwt.sign({ id }, process.env.JWT_SECRET, {
+    expiresIn: '7d',
+  });
+};
+
 const register = async (req, res, next) => {
   try {
-    const { name, email, password } = req.body;
+    const { name, email, password, role } = req.body;
 
     const userExists = await User.findOne({ email });
     if (userExists) {
       return res.status(409).json({ success: false, message: 'Email already registered' });
     }
 
-    const user = await User.create({ name, email, password });
+    const user = await User.create({ 
+      name, 
+      email, 
+      password, 
+      role: role || 'member' 
+    });
+
+    await logAction('USER_REGISTER', user._id, { email: user.email }, 'success', req);
 
     res.status(201).json({
       success: true,
@@ -25,17 +36,17 @@ const register = async (req, res, next) => {
   }
 };
 
-// @desc    Login user
-// @route   POST /api/auth/login
-// @access  Public
 const login = async (req, res, next) => {
   try {
     const { email, password } = req.body;
 
     const user = await User.findOne({ email }).select('+password');
     if (!user || !(await user.matchPassword(password))) {
+      await logAction('USER_LOGIN_FAILED', null, { email }, 'failure', req);
       return res.status(401).json({ success: false, message: 'Invalid email or password' });
     }
+
+    await logAction('USER_LOGIN', user._id, { email: user.email }, 'success', req);
 
     res.json({
       success: true,
@@ -47,9 +58,6 @@ const login = async (req, res, next) => {
   }
 };
 
-// @desc    Get logged-in user profile
-// @route   GET /api/auth/me
-// @access  Private
 const getMe = async (req, res) => {
   res.json({ success: true, user: req.user });
 };

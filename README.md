@@ -1,194 +1,183 @@
-# Task Management API
+# Task Management API - SaaS Grade Backend
 
-A RESTful API for agile teams to manage tasks across shared workspaces. Built with **Node.js**, **Express**, and **MongoDB**.
+## Overview
 
-[![Node.js](https://img.shields.io/badge/Node.js-18+-green)](https://nodejs.org)
-[![Express](https://img.shields.io/badge/Express-4.x-blue)](https://expressjs.com)
-[![MongoDB](https://img.shields.io/badge/MongoDB-Atlas-green)](https://mongodb.com)
-
----
+This project is a refactored and enhanced Task Management API, transformed into a professional SaaS-grade backend. It is built with Node.js, Express, and MongoDB, incorporating modern backend best practices for security, scalability, and maintainability. This API is suitable for portfolio demonstrations, freelance client projects, startup MVP deployment, production deployment on Railway, technical interviews, and GitHub showcase projects.
 
 ## Features
 
-- 🔐 JWT authentication (register, login, protected routes)
-- 🗂️ Workspaces — shared team environments
-- ✅ Full task CRUD — with status, priority, due dates, and assignees
-- 🔍 Query filtering by status, priority, and assignee
-- 🛡️ Security — Helmet, CORS, rate limiting (100 req/15min)
-- ⚡ Indexed MongoDB queries for performance
-- 🧪 Jest + Supertest test suite
+### Existing Features (Preserved & Enhanced)
 
----
+*   **Authentication:** User registration, login, and current user retrieval.
+*   **Workspaces:** Create, list, and view details of workspaces. Add members to workspaces.
+*   **Tasks:** Create, list, update, delete, and view details of tasks.
 
-## Getting Started
+### New Features & Refactors
 
-### Prerequisites
-- Node.js v18+
-- MongoDB (local or [Atlas](https://cloud.mongodb.com))
+1.  **Security Hardening:**
+    *   `express-validator` implemented across all endpoints for robust input validation.
+    *   `express-mongo-sanitize` to prevent MongoDB injection attacks.
+    *   `helmet` for setting various HTTP headers to protect against common vulnerabilities.
+    *   **Rate Limiting:**
+        *   Auth routes: 5 requests/minute.
+        *   API routes: 100 requests/15 minutes.
+    *   **CORS Security:** Environment-based whitelist using `CLIENT_URL`.
+    *   **Request Size Limit:** JSON payloads limited to 10kb.
+    *   **JWT Security:** 7-day expiry with strong secret enforcement and centralized authentication middleware.
 
-### Installation
+2.  **Role-Based Access Control (RBAC):**
+    *   Roles: `owner`, `admin`, `member`.
+    *   Middleware to enforce access based on user roles.
 
-```bash
-git clone https://github.com/MIKECHITI/task-management-api.git
-cd task-management-api
-npm install
-cp .env.example .env   # fill in your values
-npm run dev
-```
+3.  **User Profile Module:**
+    *   `GET /api/users/profile`: Retrieve current user profile.
+    *   `PUT /api/users/profile`: Update current user profile.
+    *   `PUT /api/users/password`: Change user password.
+    *   `DELETE /api/users/account`: Delete user account.
 
-The server starts at `http://localhost:5000`.
+4.  **Workspace Management:**
+    *   `PUT /api/workspaces/:id`: Update workspace details.
+    *   `DELETE /api/workspaces/:id`: Delete a workspace (owner only).
+    *   `DELETE /api/workspaces/:id/members/:userId`: Remove a member from a workspace (owner/admin).
 
----
+5.  **Advanced Task Management:**
+    *   `PATCH /api/tasks/:id/status`: Update task status.
+    *   `PATCH /api/tasks/:id/assign`: Assign task to a user.
+    *   Added `dueDate`, `priority` (low, medium, high), and `status` (todo, in-progress, completed) fields to tasks.
 
-## Environment Variables
+6.  **Task Search, Filtering, and Pagination:**
+    *   `GET /api/tasks?search=keyword`: Search tasks by title/description.
+    *   `GET /api/tasks?status=completed&priority=high&assignedTo=userId`: Filter tasks.
+    *   `GET /api/tasks?page=1&limit=10`: Paginate task results.
 
-| Variable | Description |
-|---|---|
-| `PORT` | Server port (default: 5000) |
-| `MONGO_URI` | MongoDB connection string |
-| `JWT_SECRET` | Secret key for signing tokens |
-| `JWT_EXPIRES_IN` | Token expiry (e.g. `7d`) |
+7.  **Task Statistics:**
+    *   `GET /api/workspaces/:id/stats`: Get task statistics for a workspace (e.g., tasks by status, by priority).
 
----
+8.  **Audit Logging:**
+    *   Tracks key actions: Login, Failed login, Workspace creation/deletion, Member addition/removal, Task creation/deletion.
 
-## API Endpoints
+9.  **Error Handling:**
+    *   Centralized error middleware for consistent error responses.
 
-All protected routes require the `Authorization: Bearer <token>` header.
+10. **Health Check Endpoint:**
+    *   `GET /health`: Provides API status and timestamp.
 
-### Auth
+11. **Database Improvements:**
+    *   Indexes added for `email`, `workspaceId`, `status`, `priority`, `assignedTo` for improved query performance.
 
-| Method | Endpoint | Access | Description |
-|---|---|---|---|
-| POST | `/api/auth/register` | Public | Register a new user |
-| POST | `/api/auth/login` | Public | Login and receive token |
-| GET | `/api/auth/me` | Private | Get current user profile |
+12. **API Documentation:**
+    *   Implemented with Swagger (`swagger-ui-express`, `swagger-jsdoc`).
+    *   Exposed at `GET /api/docs`.
 
-#### Register
-```http
-POST /api/auth/register
-Content-Type: application/json
+13. **Testing:**
+    *   Integration tests using Jest and Supertest.
+    *   Targeting 80%+ coverage.
 
-{
-  "name": "Michael Mwombe",
-  "email": "michael@example.com",
-  "password": "securepassword"
-}
-```
+## Architecture
 
-```json
-{
-  "success": true,
-  "token": "eyJhbGciOiJIUzI1NiIs...",
-  "user": { "id": "...", "name": "Michael Mwombe", "email": "michael@example.com", "role": "member" }
-}
-```
-
----
-
-### Workspaces
-
-| Method | Endpoint | Access | Description |
-|---|---|---|---|
-| GET | `/api/workspaces` | Private | List my workspaces |
-| POST | `/api/workspaces` | Private | Create a workspace |
-| GET | `/api/workspaces/:id` | Private | Get a workspace |
-| POST | `/api/workspaces/:id/members` | Private (owner) | Add a member |
-
-#### Create Workspace
-```http
-POST /api/workspaces
-Authorization: Bearer <token>
-Content-Type: application/json
-
-{
-  "name": "Sprint Team Alpha",
-  "description": "Q3 product sprint workspace"
-}
-```
-
----
-
-### Tasks
-
-| Method | Endpoint | Access | Description |
-|---|---|---|---|
-| GET | `/api/workspaces/:wId/tasks` | Private | List tasks (filterable) |
-| POST | `/api/workspaces/:wId/tasks` | Private | Create a task |
-| GET | `/api/workspaces/:wId/tasks/:id` | Private | Get a task |
-| PUT | `/api/workspaces/:wId/tasks/:id` | Private | Update a task |
-| DELETE | `/api/workspaces/:wId/tasks/:id` | Private | Delete a task |
-
-#### Create Task
-```http
-POST /api/workspaces/64abc123/tasks
-Authorization: Bearer <token>
-Content-Type: application/json
-
-{
-  "title": "Implement login page",
-  "description": "Build responsive login with form validation",
-  "status": "todo",
-  "priority": "high",
-  "dueDate": "2024-08-01",
-  "assignedTo": "64user456"
-}
-```
-
-#### Filter Tasks
-```
-GET /api/workspaces/:wId/tasks?status=in-progress&priority=high
-GET /api/workspaces/:wId/tasks?assignedTo=<userId>
-```
-
----
-
-## Data Models
-
-### Task
-| Field | Type | Values |
-|---|---|---|
-| title | String | required, max 100 |
-| description | String | optional, max 500 |
-| status | Enum | `todo` · `in-progress` · `done` |
-| priority | Enum | `low` · `medium` · `high` |
-| dueDate | Date | optional |
-| assignedTo | ObjectId → User | optional |
-| tags | [String] | optional |
-
----
-
-## Running Tests
-
-```bash
-npm test
-```
-
----
-
-## Deployment
-
-Recommended: [Railway](https://railway.app) or [Render](https://render.com) (both have free tiers).
-
-1. Push to GitHub
-2. Connect repo to Railway/Render
-3. Set environment variables in the dashboard
-4. Deploy — done!
-
----
-
-## Project Structure
+The project follows a modular and layered architecture, promoting separation of concerns and maintainability.
 
 ```
 src/
-├── config/       # Database connection
-├── controllers/  # Route handler logic
-├── middleware/   # Auth, error handling
-├── models/       # Mongoose schemas
-├── routes/       # Express routers
-└── utils/        # JWT helper
-tests/            # Jest + Supertest
+├── config/             # Database connection, environment setup
+├── controllers/        # Request handling logic
+├── routes/             # API endpoints definitions
+├── models/             # Mongoose schemas and models
+├── middlewares/        # Express middleware (auth, security, error handling)
+├── validators/         # Input validation schemas
+├── services/           # Business logic and reusable functions (e.g., audit logging)
+├── utils/              # Utility functions (e.g., token generation)
+├── docs/               # Swagger API documentation setup
+├── tests/              # Unit and integration tests
+├── app.js              # Express application setup, middleware, and route mounting
+└── server.js           # Server entry point, database connection, and listener
 ```
 
----
+## Installation
 
-Built by [Michael Mwombe](https://mwombemichael.vercel.app)
+1.  **Clone the repository:**
+    ```bash
+    git clone https://github.com/MIKECHITI/task-management-api.git
+    cd task-management-api
+    ```
+
+2.  **Install dependencies:**
+    ```bash
+    pnpm install
+    ```
+
+3.  **Set up environment variables:**
+    Create a `.env` file in the root directory based on `.env.example`.
+
+4.  **Start the development server:**
+    ```bash
+    pnpm run dev
+    ```
+    The API will be running at `http://localhost:5000`.
+
+## Environment Variables
+
+Create a `.env` file in the root of your project and add the following:
+
+```
+PORT=5000
+NODE_ENV=development
+MONGO_URI=mongodb://localhost:27017/task-management
+JWT_SECRET=your_super_secret_jwt_key
+CLIENT_URL=http://localhost:3000
+```
+
+*   `PORT`: The port your server will run on.
+*   `NODE_ENV`: Environment mode (e.g., `development`, `production`).
+*   `MONGO_URI`: Your MongoDB connection string.
+*   `JWT_SECRET`: A strong, secret key for JWT signing.
+*   `CLIENT_URL`: Comma-separated list of allowed client origins for CORS.
+
+## API Documentation
+
+Access the interactive API documentation (Swagger UI) at `http://localhost:5000/api/docs` when the server is running.
+
+## Railway Deployment Guide
+
+This project is configured for seamless deployment on Railway. Ensure your `.env` variables are set correctly in Railway's environment settings.
+
+1.  **Create a new project on Railway.**
+2.  **Connect your GitHub repository.**
+3.  **Railway will automatically detect the Node.js project and deploy it.**
+4.  **Configure Environment Variables:** Add the variables from your `.env` file to Railway's variables section.
+5.  **Add a MongoDB service:** Link a MongoDB service to your project on Railway, and ensure `MONGO_URI` is correctly set.
+
+## Example Requests
+
+(Coming Soon: Detailed `curl` examples and Postman collection will be provided.)
+
+## Example Responses
+
+(Coming Soon: Sample JSON responses for key endpoints will be provided.)
+
+## Running Tests
+
+To run the integration tests:
+
+```bash
+pnpm test
+```
+
+To run tests with coverage report:
+
+```bash
+pnpm run test:coverage
+```
+
+## Senior-Level Recommendations
+
+1.  **Containerization (Docker):** For consistent environments across development, testing, and production, containerize the application using Docker. This would involve creating a `Dockerfile` and `docker-compose.yml` for local development with MongoDB.
+2.  **Centralized Configuration Management:** For larger deployments, consider using a dedicated configuration management service (e.g., HashiCorp Vault, AWS Secrets Manager) to manage sensitive environment variables more securely than `.env` files.
+3.  **Advanced Logging & Monitoring:** Integrate a more robust logging solution (e.g., Winston, Pino) with a log aggregation service (e.g., ELK Stack, Datadog) for better visibility into application health and issues. Implement APM (Application Performance Monitoring) tools.
+4.  **Database Sharding & Replication:** For high-traffic applications, plan for MongoDB sharding and replication to ensure high availability and horizontal scalability.
+5.  **Caching:** Implement caching mechanisms (e.g., Redis) for frequently accessed data to reduce database load and improve response times.
+6.  **CI/CD Pipeline:** Set up a comprehensive CI/CD pipeline (e.g., GitHub Actions, GitLab CI, Jenkins) to automate testing, building, and deployment processes, ensuring faster and more reliable releases.
+7.  **Input Sanitization beyond `express-mongo-sanitize`:** While `express-mongo-sanitize` handles MongoDB-specific injections, consider a more generic input sanitization library (e.g., `xss-clean`, `dompurify` for HTML content) if the application handles diverse user inputs that could lead to XSS or other injection attacks.
+8.  **GraphQL API:** For more flexible data fetching and reduced over-fetching/under-fetching, consider implementing a GraphQL layer on top of the REST API.
+9.  **WebSockets for Real-time Updates:** For features like real-time task updates or notifications, integrate WebSockets (e.g., Socket.IO) to provide a more dynamic user experience.
+10. **Idempotency for API Calls:** For critical write operations, implement idempotency keys to prevent duplicate processing of requests due to network issues or client retries.

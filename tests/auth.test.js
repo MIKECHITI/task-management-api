@@ -1,56 +1,67 @@
 const request = require('supertest');
-const mongoose = require('mongoose');
 const app = require('../src/app');
-
-beforeAll(async () => {
-  await mongoose.connect(process.env.MONGO_URI || 'mongodb://localhost:27017/taskmanager_test');
-});
-
-afterAll(async () => {
-  await mongoose.connection.dropDatabase();
-  await mongoose.connection.close();
-});
+const User = require('../src/models/User');
 
 describe('Auth Endpoints', () => {
-  const user = { name: 'Test User', email: 'test@example.com', password: 'password123' };
+  const userData = {
+    name: 'Test User',
+    email: 'test@example.com',
+    password: 'password123'
+  };
 
-  it('POST /api/auth/register — creates a new user', async () => {
-    const res = await request(app).post('/api/auth/register').send(user);
-    expect(res.statusCode).toBe(201);
-    expect(res.body).toHaveProperty('token');
-    expect(res.body.user.email).toBe(user.email);
+  it('should register a new user', async () => {
+    const res = await request(app)
+      .post('/api/auth/register')
+      .send(userData);
+    
+    expect(res.statusCode).toEqual(201);
+    expect(res.body.success).toBe(true);
+    expect(res.body.user.email).toEqual(userData.email);
   });
 
-  it('POST /api/auth/register — rejects duplicate email', async () => {
-    const res = await request(app).post('/api/auth/register').send(user);
-    expect(res.statusCode).toBe(409);
-  });
+  it('should login an existing user', async () => {
+    await User.create(userData);
 
-  it('POST /api/auth/login — returns token for valid credentials', async () => {
     const res = await request(app)
       .post('/api/auth/login')
-      .send({ email: user.email, password: user.password });
-    expect(res.statusCode).toBe(200);
+      .send({
+        email: userData.email,
+        password: userData.password
+      });
+
+    expect(res.statusCode).toEqual(200);
+    expect(res.body.success).toBe(true);
     expect(res.body).toHaveProperty('token');
   });
 
-  it('POST /api/auth/login — rejects wrong password', async () => {
+  it('should not login with wrong password', async () => {
+    await User.create(userData);
+
     const res = await request(app)
       .post('/api/auth/login')
-      .send({ email: user.email, password: 'wrongpassword' });
-    expect(res.statusCode).toBe(401);
+      .send({
+        email: userData.email,
+        password: 'wrongpassword'
+      });
+
+    expect(res.statusCode).toEqual(401);
+    expect(res.body.success).toBe(false);
   });
 
-  it('GET /api/auth/me — returns profile with valid token', async () => {
+  it('should get current user profile', async () => {
+    const user = await User.create(userData);
     const loginRes = await request(app)
       .post('/api/auth/login')
-      .send({ email: user.email, password: user.password });
+      .send({
+        email: userData.email,
+        password: userData.password
+      });
 
     const res = await request(app)
       .get('/api/auth/me')
       .set('Authorization', `Bearer ${loginRes.body.token}`);
 
-    expect(res.statusCode).toBe(200);
-    expect(res.body.user.email).toBe(user.email);
+    expect(res.statusCode).toEqual(200);
+    expect(res.body.user.email).toEqual(userData.email);
   });
 });

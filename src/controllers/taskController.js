@@ -1,101 +1,70 @@
 const Task = require('../models/Task');
-const Workspace = require('../models/Workspace');
+const { logAction } = require('../services/auditService');
 
-// Helper — check user is a workspace member
-const isMember = (workspace, userId) =>
-  workspace.owner.equals(userId) ||
-  workspace.members.some((m) => m.user.equals(userId));
-
-// @desc    Get all tasks in a workspace (with optional filters)
-// @route   GET /api/workspaces/:workspaceId/tasks
-// @access  Private
-const getTasks = async (req, res, next) => {
-  try {
-    const workspace = await Workspace.findById(req.params.workspaceId);
-    if (!workspace) return res.status(404).json({ success: false, message: 'Workspace not found' });
-    if (!isMember(workspace, req.user._id))
-      return res.status(403).json({ success: false, message: 'Not a workspace member' });
-
-    const { status, priority, assignedTo } = req.query;
-    const filter = { workspace: req.params.workspaceId };
-    if (status) filter.status = status;
-    if (priority) filter.priority = priority;
-    if (assignedTo) filter.assignedTo = assignedTo;
-
-    const tasks = await Task.find(filter)
-      .populate('assignedTo', 'name email')
-      .populate('createdBy', 'name email')
-      .sort({ createdAt: -1 });
-
-    res.json({ success: true, count: tasks.length, tasks });
-  } catch (err) {
-    next(err);
-  }
-};
-
-// @desc    Get single task
-// @route   GET /api/workspaces/:workspaceId/tasks/:id
-// @access  Private
-const getTask = async (req, res, next) => {
-  try {
-    const task = await Task.findOne({
-      _id: req.params.id,
-      workspace: req.params.workspaceId,
-    })
-      .populate('assignedTo', 'name email')
-      .populate('createdBy', 'name email');
-
-    if (!task) return res.status(404).json({ success: false, message: 'Task not found' });
-
-    const workspace = await Workspace.findById(req.params.workspaceId);
-    if (!isMember(workspace, req.user._id))
-      return res.status(403).json({ success: false, message: 'Not a workspace member' });
-
-    res.json({ success: true, task });
-  } catch (err) {
-    next(err);
-  }
-};
-
-// @desc    Create a task
-// @route   POST /api/workspaces/:workspaceId/tasks
-// @access  Private
 const createTask = async (req, res, next) => {
   try {
-    const workspace = await Workspace.findById(req.params.workspaceId);
-    if (!workspace) return res.status(404).json({ success: false, message: 'Workspace not found' });
-    if (!isMember(workspace, req.user._id))
-      return res.status(403).json({ success: false, message: 'Not a workspace member' });
-
     const task = await Task.create({
       ...req.body,
-      createdBy: req.user._id,
-      workspace: req.params.workspaceId,
+      createdBy: req.user.id
     });
 
+    await logAction('TASK_CREATE', req.user.id, { taskId: task._id }, 'success', req);
     res.status(201).json({ success: true, task });
   } catch (err) {
     next(err);
   }
 };
 
-// @desc    Update a task
-// @route   PUT /api/workspaces/:workspaceId/tasks/:id
-// @access  Private
-const updateTask = async (req, res, next) => {
+const getTasks = async (req, res, next) => {
   try {
-    const workspace = await Workspace.findById(req.params.workspaceId);
-    if (!workspace) return res.status(404).json({ success: false, message: 'Workspace not found' });
-    if (!isMember(workspace, req.user._id))
-      return res.status(403).json({ success: false, message: 'Not a workspace member' });
+    const { status, priority, assignedTo, search, page = 1, limit = 10, workspaceId } = req.query;
+    const query = {};
 
-    const task = await Task.findOneAndUpdate(
-      { _id: req.params.id, workspace: req.params.workspaceId },
-      req.body,
-      { new: true, runValidators: true }
-    );
+    if (workspaceId) query.workspaceId = workspaceId;
+    if (status) query.status = status;
+    if (priority) query.priority = priority;
+    if (assignedTo) query.assignedTo = assignedTo;
+    if (search) {
+      query.$text = { $search: search };
+    }
 
-    if (!task) return res.status(404).json({ success: false, message: 'Task not found' });
+    const skip = (page - 1) * limit;
+
+    const tasks = await Task.find(query)
+      .populate('assignedTo', 'name email')
+      .populate('createdBy', 'name email')
+      .skip(skip)
+      .limit(parseInt(limit))
+      .sort({ createdAt: -1 });
+
+    const total = await Task.countDocuments(query);
+
+    res.json({
+      success: true,
+      count: tasks.length,
+      total,
+      pagination: {
+        page: parseInt(page),
+        limit: parseInt(limit),
+        pages: Math.ceil(total / limit)
+      },
+      tasks
+    });
+  } catch (err) {
+    next(err);
+  }
+};
+
+const getTaskDetails = async (req, res, next) => {
+  try {
+    const task = await Task.findById(req.params.id)
+      .populate('assignedTo', 'name email')
+      .populate('createdBy', 'name email')
+      .populate('workspaceId', 'name');
+
+    if (!task) {
+      return res.status(404).json({ success: false, message: 'Task not found' });
+    }
 
     res.json({ success: true, task });
   } catch (err) {
@@ -103,27 +72,71 @@ const updateTask = async (req, res, next) => {
   }
 };
 
-// @desc    Delete a task
-// @route   DELETE /api/workspaces/:workspaceId/tasks/:id
-// @access  Private
-const deleteTask = async (req, res, next) => {
+const updateTask = async (req, res, next) => {
   try {
-    const workspace = await Workspace.findById(req.params.workspaceId);
-    if (!workspace) return res.status(404).json({ success: false, message: 'Workspace not found' });
-    if (!isMember(workspace, req.user._id))
-      return res.status(403).json({ success: false, message: 'Not a workspace member' });
-
-    const task = await Task.findOneAndDelete({
-      _id: req.params.id,
-      workspace: req.params.workspaceId,
+    const task = await Task.findByIdAndUpdate(req.params.id, req.body, {
+      new: true,
+      runValidators: true
     });
 
-    if (!task) return res.status(404).json({ success: false, message: 'Task not found' });
+    if (!task) {
+      return res.status(404).json({ success: false, message: 'Task not found' });
+    }
 
-    res.json({ success: true, message: 'Task deleted' });
+    res.json({ success: true, task });
   } catch (err) {
     next(err);
   }
 };
 
-module.exports = { getTasks, getTask, createTask, updateTask, deleteTask };
+const deleteTask = async (req, res, next) => {
+  try {
+    const task = await Task.findByIdAndDelete(req.params.id);
+    if (!task) {
+      return res.status(404).json({ success: false, message: 'Task not found' });
+    }
+
+    await logAction('TASK_DELETE', req.user.id, { taskId: req.params.id }, 'success', req);
+    res.json({ success: true, message: 'Task deleted successfully' });
+  } catch (err) {
+    next(err);
+  }
+};
+
+const patchTaskStatus = async (req, res, next) => {
+  try {
+    const { status } = req.body;
+    const task = await Task.findByIdAndUpdate(
+      req.params.id,
+      { status },
+      { new: true, runValidators: true }
+    );
+    res.json({ success: true, task });
+  } catch (err) {
+    next(err);
+  }
+};
+
+const patchTaskAssign = async (req, res, next) => {
+  try {
+    const { assignedTo } = req.body;
+    const task = await Task.findByIdAndUpdate(
+      req.params.id,
+      { assignedTo },
+      { new: true, runValidators: true }
+    );
+    res.json({ success: true, task });
+  } catch (err) {
+    next(err);
+  }
+};
+
+module.exports = {
+  createTask,
+  getTasks,
+  getTaskDetails,
+  updateTask,
+  deleteTask,
+  patchTaskStatus,
+  patchTaskAssign
+};
