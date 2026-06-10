@@ -122,7 +122,7 @@ Create a `.env` file in the root of your project and add the following:
 ```
 PORT=5000
 NODE_ENV=development
-MONGO_URI=mongodb://localhost:27017/task-management
+MONGO_URI= your Mongo_url here
 JWT_SECRET=your_super_secret_jwt_key
 CLIENT_URL=http://localhost:3000
 ```
