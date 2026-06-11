@@ -174,7 +174,7 @@ git push origin main
 
 - `PORT` → `5000` (optional; Render provides a port)
 - `MONGO_URI` → your full Atlas connection string; example format:
-  `mongodb+srv://<dbUser>:<password>@cluster0.aghnt01.mongodb.net/<database>?retryWrites=true&w=majority&appName=Cluster0`
+  `mongodb+srv://<dbUser>:<password>@cluster0.aghnt01.mongodb.net/<database>?retryWrites=true&w=majority&appName=Cluster4`
 - `JWT_SECRET` → a single-line secret string
 - `JWT_EXPIRES_IN` → `7d`
 
